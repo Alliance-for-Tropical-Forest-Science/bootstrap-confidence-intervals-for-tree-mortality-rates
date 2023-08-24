@@ -1,0 +1,84 @@
+---
+title: "Boostrapping mortality rates"
+author: Daniel Zuleta
+date: July, 2023 ATFS-MWG
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(warning = F, message = F)
+```
+
+### 0. Simulated dataset ###
+We will use a simulated dataset with the necessary metrics at the quadrat level for each period (note that it can be done at any scale)
+```{r}
+
+
+# Set  the seed to generate the same simulation
+set.seed(23842232)
+
+# Generate the data
+metrics.period <- data.frame(
+  quadrat = LETTERS[1:25],
+  N0 = sample(100:200, 25, replace = T),
+  time.diff = sample(2:5, 25, replace = T)
+)
+for(i in 1:nrow(metrics.period)) metrics.period$NsT[i] <-  floor(metrics.period$N0[i]*sample(seq(0.85, 1, 0.1), 1))
+
+```
+Simulated dataset:
+N0: Initial number of individual trees at t = 0 in a given quadrat; time.diff: time census interval in years for a given quadrat; NsT: Number of surviving trees at t = T in a given quadrat
+```{r}
+metrics.period
+```
+
+## 1. Estimate the true mortality rates ##
+We will use equation 5 in Kohyama et al. (2018) DOI:	10.1111/2041-210X.12929
+```{r}
+# Annual mortality rates Kohyama et al. 2018 (Table 1).
+true.rates.per.quadrat <- 1 - (metrics.period$NsT / metrics.period$N0)^(1/metrics.period$time.diff)
+true.rates.plot <- 1 - (sum(metrics.period$NsT) / sum(metrics.period$N0))^(1/mean(metrics.period$time.diff))
+
+true.rates.per.quadrat # true mortality at the stand level
+true.rates.plot # true mortality at the quadrat level
+```
+
+## 2. Bootstrap over quadrats to get the confidence intervals ####
+
+```{r}
+# define the number of simulations for the bootstrap (usually 1000)
+nsim = 1000
+# empty vector
+m.boot = NULL
+
+for (i in 1:nsim){
+  temp <- 1:nrow(metrics.period)
+  temp2 <- sample(temp, replace = T)
+  
+  metrics.period.i <- metrics.period[temp2,]
+  rates.i <- 1 - (metrics.period.i$NsT / metrics.period.i$N0)^(1/metrics.period.i$time.diff) # Here you should do all the calculations in case you want to bootstrap more variables e.g., biomass
+  
+  # estimating the average mortality from the realization i
+  m.i <- mean(rates.i)
+  
+  # SAVE main results from this iteration
+  m.boot = c(m.boot, m.i)
+}
+```
+
+## 3. Get the confidence intervals
+
+```{r}
+m.lo <- quantile(m.boot, probs = c(0.025))
+m.hi <- quantile(m.boot, probs = c(0.975))
+
+true.rates.plot
+m.lo
+m.hi
+
+```
+
+
+
